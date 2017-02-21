@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import time
 import json
 import os
@@ -11,12 +12,56 @@ import urllib2
 import thread
 from bs4 import BeautifulSoup
 from slugify import slugify
+from gtts import gTTS
+from tempfile import NamedTemporaryFile
 
 ruserlist = list()
 auserlist = list()
 muserlist = list()
 duserlist = list()
+playing = 0
 
+def say(word,args):
+        global playing
+        if(playing==0):
+                tts= gTTS(text=word,lang='it')
+                f=NamedTemporaryFile()
+                tts.write_to_fp(f)
+                cmd="mpg321 -q "+f.name
+                os.system("pkill -SIGHUP mpg321")
+                os.system(cmd)
+                f.close()
+
+def play(m,arg):
+        global playing
+        if(playing==1):
+                bot.sendMessage(m.chat.id, "Le canzoni sono gia in play")
+        else:
+                bot.sendMessage(m.chat.id, "Avvio riproduzione canzoni")
+                say("Ok "+m.chat.first_name+", avvio riproduzione canzoni",1)
+                playing = 1
+                os.system("mpg321 -q -z -l 0 Music/*")
+
+def stop(m):
+        global playing
+        if(playing==0):
+                bot.sendMessage(m.chat.id, "Nessuna canzone in play al momento")
+                say("Nessuna canzone in play al momento "+m.chat.first_name,1)
+        else:
+                playing = 0
+                os.system("pkill -SIGHUP mpg321")
+                bot.sendMessage(m.chat.id, "Stop riproduzione canzoni")
+
+def next(m):
+        global playing
+        if(playing==0):
+                bot.sendMessage(m.chat.id, "Nessuna canzone in play al momento")
+                say("Nessuna canzone in play al momento "+m.chat.first_name,1)
+        else:
+                os.system("pkill -SIGINT mpg321")
+                bot.sendMessage(m.chat.id, "Cambio canzone")
+                
+        
 def rimuoviUtente(m,command):
 	global ruserlist
 	ok=-1
@@ -32,9 +77,11 @@ def rimuoviUtente(m,command):
 			ok=1
 	f.close()
 	if ok==1:
-		bot.sendMessage(m.chat.id, 'Utente %s rimosso con successo' % command)
+		buff="Utente %s rimosso con successo" % command
 	else:
-		bot.sendMessage(m.chat.id, 'Utente %s non presente nella lista utenti' % command)
+		buff="Utente %s non presente nella lista utenti" % command	
+        thread.start_new_thread(say,(buff,1))
+	bot.sendMessage(m.chat.id,buff)
 
 def aggiungiUtente(m,command):
 	global auserlist
@@ -52,9 +99,11 @@ def aggiungiUtente(m,command):
 			f.write(line)
 	if ok==1:
 		f.write(command+"\n")
-		bot.sendMessage(m.chat.id, 'Utente %s aggiunto con successo' % command)
+		buff= "Utente %s aggiunto con successo" % command
 	else:
-		bot.sendMessage(m.chat.id, 'Utente %s gia presente nella lista utenti' % command)
+		buff = "Utente %s gia presente nella lista utenti" % command
+	thread.start_new_thread(say,(buff,1))
+	bot.sendMessage(m.chat.id, buff)
 	f.close()
 
 def downloadCanzone(m,command):
@@ -63,7 +112,9 @@ def downloadCanzone(m,command):
         base_url = 'http://www.youtubeinmp3.com/fetch/?format=JSON&video='
 	muserlist.remove(m.chat.first_name)
 	song_name = command
-	bot.sendMessage(m.chat.id,'Bene '+m.chat.first_name+', la canzone \"'+song_name+'\" e in preparazione...')
+	buff='Bene '+m.chat.first_name+', la canzone \"'+song_name+'\" e in preparazione...'
+	bot.sendMessage(m.chat.id,buff)
+	say(buff,1)
 	query = urllib.quote(song_name+ "song")
         url = "https://www.youtube.com/results?search_query=" + query
         response = urllib2.urlopen(url)
@@ -95,33 +146,39 @@ def downloadCanzone(m,command):
                         print ('upload_file name : ' + upload_file)
                         if not (os.path.exists(upload_file)) :
                                 if(int(length)>601):
-                                    bot.sendMessage(m.chat.id, 'Lunghezza canzone superiore a 10 minuti, download annullato. Riprova con un titolo diverso')
-                                    print ('Lunghezza canzone superiore a 10 minuti, download annullato.')
+                                        buff="La lunghezza della canzone supera i 10 minuti, download annullato. Riprova con un titolo diverso"
+                                        bot.sendMessage(m.chat.id, buff)
+                                        say(buff,1)
+                                        print ('Lunghezza canzone superiore a 10 minuti, download annullato.')
                                 else:
-                                    bot.sendMessage(m.chat.id, 'Il download della tua canzone e iniziato...')
-                                    print ('Download della canzone nella collezione del bot.')
-                                    downloadSong(downLoad_url, upload_file)
-                                    bot.sendMessage(m.chat.id, 'Download completato. La canzone e in fase di invio. Attendi per favore.')
-                                    print ('Download completato.')
-                                    print ('Inviando canzone')
-                                    bot.sendAudio(m.chat.id, open(upload_file , 'rb'),'','', title)
-                                    print ('Inviata con successo!')
+                                        buff=m.chat.first_name+" il download della tua canzone e iniziato..."
+                                        bot.sendMessage(m.chat.id, buff)
+                                        say(buff,1)
+                                        print ('Download della canzone nella collezione del bot.')
+                                        downloadSong(downLoad_url, upload_file)
+                                        buff="Download completato. La canzone e stata aggiunta alla collezione"
+                                        bot.sendMessage(m.chat.id, buff)
+                                        say(buff,1)
+                                        print ('Download completato.')
                                 duserlist.remove(m.chat.first_name)
                         else:
-                                bot.sendMessage(m.chat.id, 'Download completato. La canzone e in fase di invio. Attendi per favore.')
+                                buff=m.chat.first_name+" la canzone "+song_name+" e gia presente nella collezione"
+                                bot.sendMessage(m.chat.id, buff)
+                                say(buff,1)
                                 print ('Canzone gia presente nella collezione.')
-                                print ('Inviando canzone')
-                                bot.sendAudio(m.chat.id, open(upload_file , 'rb'),'', '', title)
-                                print ('Inviata con successo!')
                                 duserlist.remove(m.chat.first_name)
                 except ValueError as e:
-                        print 'Nessuna canzone trovata', e
+                        print 'Nessuna canzone trovata'
                         duserlist.remove(m.chat.first_name)
-                        bot.sendMessage(m.chat.id, 'Nessuna canzone trovata, per favore riprova con un titolo diverso')
+                        buff="Non e stata trovata nessuna canzone con quel titolo "+m.chat.first_name+", per favore, riprova con un titolo diverso"
+                        bot.sendMessage(m.chat.id, buff)
+                        say(buff,1)
                 except Exception as e:
                         print 'Errore inaspettato' , e
                         duserlist.remove(m.chat.first_name)
-                        bot.sendMessage(m.chat.id, 'Errore inaspettato, per favore riprova piu tardi')
+                        buff= "Errore nel download inaspettato, per favore riprova piu tardi"+m.chat.first_name
+                        bot.sendMessage(m.chat.id, buff)
+                        say(buff,1)
                 break
 
 def downloadSong(url, fileLoc):
@@ -166,9 +223,12 @@ def handle(msg):
 		ok = True
 	if ok:
 		if command == '/start':
-			bot.sendMessage(chat_id, 'Tron Avviato...\nDimmi cosa fare e faro del mio meglio per aiutarti '+winking_face)
+                        buff="Tron Avviato...\nDimmi cosa fare e faro del mio meglio per aiutarti "+winking_face
+			bot.sendMessage(chat_id, buff)
+			thread.start_new_thread(say,(buff,1))
 		elif command == '/ping':
 			buff = 'Al tuo servizio ' + winking_face
+			thread.start_new_thread(say,(buff,1))
 			bot.sendMessage(chat_id, buff)
 		elif  m.chat.first_name in ruserlist:
 			rimuoviUtente(m,command)
@@ -177,6 +237,12 @@ def handle(msg):
 		elif m.chat.first_name in muserlist:
                         duserlist.extend([m.chat.first_name])
                         thread.start_new_thread(downloadCanzone,(m, command))
+                elif command == '/play':
+                        thread.start_new_thread(play,(m,1))
+                elif command == '/stop':
+                        stop(m)
+                elif command == '/next':
+                        next(m)
 		elif command == '/casuale100':
 			bot.sendMessage(chat_id, random.randint(1, 100))
 		elif command == '/casuale20':
@@ -184,16 +250,33 @@ def handle(msg):
 		elif command == '/casuale6':
 			bot.sendMessage(chat_id, random.randint(1, 6))
 		elif command == '/data':
-			buff = '%s/%s/%s' % (str(datetime.datetime.now().day), str(datetime.datetime.now().month),
+                        nday=datetime.datetime.today().weekday()
+                        if(nday==0):
+                                day="Lunedì"
+                        elif(nday==1):
+                                day="Martedì"
+                        elif(nday==2):
+                                day="Mercoledì"
+                        elif(nday==3):
+                                day="Giovedì"
+                        elif(nday==4):
+                                day="Venerdì"
+                        elif(nday==5):
+                                day="Sabato"
+                        elif(nday==6):
+                                day="Domenica"
+			buff = 'Oggi è %s %s/%s/%s' % (day, str(datetime.datetime.now().day), str(datetime.datetime.now().month),
 								 str(datetime.datetime.now().year))
+			thread.start_new_thread(say,(buff,1))
 			bot.sendMessage(chat_id, buff)
 		elif command == '/downloadsong':
 			if  m.chat.first_name in duserlist:
-                            bot.sendMessage(chat_id, 'Download di una canzone gia in corso, attendi per favore')
+                            buff="Download di una canzone già in corso, attendi per favore"
                         else:
                             muserlist.extend([m.chat.first_name])
                             buff= 'Ok %s inviami il titolo e/o l autore della canzone' %  m.chat.first_name
-                            bot.sendMessage(chat_id, buff)
+                        thread.start_new_thread(say,(buff,1))
+                        bot.sendMessage(chat_id, buff)
 		elif command == '/aggiungiutente':
 			with open('Admin.txt') as f1:
 				array1 = [line.rstrip() for line in f1]
@@ -201,25 +284,29 @@ def handle(msg):
 			if m.chat.username in array1:
 				auserlist.extend([m.chat.first_name])
 				buff = 'Ok %s inviami il nome utente da aggiungere' % m.chat.first_name
-				bot.sendMessage(chat_id, buff)
 			else:
-				buff = 'Perdonami %s ma bisogna essere amministratore per esequire questo comando...' % m.chat.first_name
-				bot.sendMessage(chat_id, buff)
+				buff = 'Perdonami %s ma bisogna essere amministratore per eseguire questo comando...' % m.chat.first_name
+			thread.start_new_thread(say,(buff,1))
+			bot.sendMessage(chat_id, buff)
 		elif command == '/rimuoviutente':
 			with open('Admin.txt') as f1:
 				array1 = [line.rstrip() for line in f1]
 			f1.close()
 			if m.chat.username in array1:
 				ruserlist.extend([m.chat.first_name])
-				buff= 'Ok %s inviami il nome utente da rimuvere' %  m.chat.first_name
+				buff= 'Ok %s inviami il nome utente da rimuovere' %  m.chat.first_name
+				thread.start_new_thread(say,(buff,1))
 				bot.sendMessage(chat_id, buff)
 			else:
-				buff = 'Perdonami %s ma bisogna essere amministratore per esequire questo comando...' % m.chat.first_name
+				buff = 'Perdonami %s ma bisogna essere amministratore per eseguire questo comando...' % m.chat.first_name
+				thread.start_new_thread(say,(buff,1))
 				bot.sendMessage(chat_id, buff)
 		elif command == '/localip':
 			s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 			s.connect(("gmail.com", 80))
-			bot.sendMessage(chat_id, s.getsockname()[0])
+			buff=s.getsockname()[0]
+			bot.sendMessage(chat_id, buff)
+			thread.start_new_thread(say,("IP locale: "+buff,1))
 			s.close()
 		elif command == '/listautenti':
 			with open('Admin.txt') as f1:
@@ -232,7 +319,8 @@ def handle(msg):
 				for user in array2:
 					bot.sendMessage(chat_id, user)
 			else:
-				buff = 'Perdonami %s ma bisogna essere amministratore per esequire questo comando...' % m.chat.first_name
+				buff = 'Perdonami %s ma bisogna essere amministratore per eseguire questo comando...' % m.chat.first_name
+				thread.start_new_thread(say,(buff,1))
 				bot.sendMessage(chat_id, buff)
 		elif command == '/sam':
 			i=random.randint(1, 6)
@@ -241,10 +329,12 @@ def handle(msg):
 			in_file.close()
 		else:
 			buff = 'Perdonami %s ma non conosco questo comando...' % m.chat.first_name
+			thread.start_new_thread(say,(buff,1))
 			bot.sendMessage(chat_id, buff)
 
 	else:
 		buff = 'Perdonami %s ma non hai i permessi per farmi eseguire comandi...' % m.chat.first_name
+		thread.start_new_thread(say,(buff,1))
 		bot.sendMessage(chat_id, buff)
 		if m.chat.username == 'None':
 			bot.sendMessage(chat_id, 'Sembra inoltre che tu non abbia uno Username, per crearne uno vai in impostazioni'
