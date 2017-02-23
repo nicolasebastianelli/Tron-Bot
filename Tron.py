@@ -10,6 +10,7 @@ import socket
 import urllib
 import urllib2
 import thread
+import YeelightWifiBulbLanCtrl
 from bs4 import BeautifulSoup
 from slugify import slugify
 from gtts import gTTS
@@ -19,7 +20,9 @@ ruserlist = list()
 auserlist = list()
 muserlist = list()
 duserlist = list()
+cuserlist = list()
 playing = 0
+light=1
 
 def say(word,args):
         global playing
@@ -46,7 +49,6 @@ def stop(m):
         global playing
         if(playing==0):
                 bot.sendMessage(m.chat.id, "Nessuna canzone in play al momento")
-                say("Nessuna canzone in play al momento "+m.chat.first_name,1)
         else:
                 playing = 0
                 os.system("pkill -SIGHUP mpg321")
@@ -56,11 +58,62 @@ def next(m):
         global playing
         if(playing==0):
                 bot.sendMessage(m.chat.id, "Nessuna canzone in play al momento")
-                say("Nessuna canzone in play al momento "+m.chat.first_name,1)
         else:
                 os.system("pkill -SIGINT mpg321")
                 bot.sendMessage(m.chat.id, "Cambio canzone")
-                
+
+def cambiaColore(m,command):
+        global cuserlist
+        global light
+	cuserlist.remove(m.chat.first_name)
+        command=command.lower()
+        if command == "blu":
+                color = 65536*0+256*0+255
+        elif command == "viola":
+                color = 65536*127+256*0+255
+        elif command == "magenta":
+                color = 65536*255+256*0+255
+        elif command == "azzurro":
+                color = 65536*0+256*255+255
+        elif command == "verde":
+                color = 65536*128+256*255+0
+        elif command == "arancione":
+                color = 65536*255+256*128+0
+        elif command == "giallo":
+                color = 65536*255+256*255+0
+        elif command == "rosso":
+                color = 65536*255+256*0+0
+        elif command == "bianco":
+                color = 65536*255+256*255+255
+        else:
+                buff= "Colore inserito non valido."
+                bot.sendMessage(m.chat.id, buff)
+                thread.start_new_thread(say,(buff,1))
+                return
+        if not YeelightWifiBulbLanCtrl.bulb_idx2ip.has_key(1):
+                buff= "Nessuna lampadina connessa, accendi lampadina"
+                bot.sendMessage(m.chat.id, buff)
+                thread.start_new_thread(say,(buff,1))
+        else:
+                if light==0:
+                        value=YeelightWifiBulbLanCtrl.toggle_bulb(1)
+                        if value==0:
+                                buff= "Lampadina connessa non trovata, prova a spegnere e riaccendere la lampadina"
+                                bot.sendMessage(m.chat.id, buff)
+                                thread.start_new_thread(say,(buff,1))
+                                refresh()
+                                return
+                        light=1                        
+                value=YeelightWifiBulbLanCtrl.set_color(1,color)
+                if value==0:
+                        buff= "Lampadina connessa non trovata, prova a spegnere e riaccendere la lampadina"
+                        bot.sendMessage(m.chat.id, buff)
+                        thread.start_new_thread(say,(buff,1))
+                        refresh()
+                else: 
+                        buff= "Colore "+command+" della luce impostato"
+                        bot.sendMessage(m.chat.id, buff)
+                        thread.start_new_thread(say,(buff,1))
         
 def rimuoviUtente(m,command):
 	global ruserlist
@@ -237,12 +290,44 @@ def handle(msg):
 		elif m.chat.first_name in muserlist:
                         duserlist.extend([m.chat.first_name])
                         thread.start_new_thread(downloadCanzone,(m, command))
+                elif m.chat.first_name in cuserlist:
+                        cambiaColore(m, command)
                 elif command == '/play':
                         thread.start_new_thread(play,(m,1))
                 elif command == '/stop':
                         stop(m)
                 elif command == '/next':
                         next(m)
+                elif command == '/colore':
+                        cuserlist.extend([m.chat.first_name])
+			buff = 'Ok %s, inviami il colore che vuoi' % m.chat.first_name
+			bot.sendMessage(chat_id, buff)
+			thread.start_new_thread(say,(buff,1))
+                elif command == '/spegniaccendi':
+                        global light
+                        if not YeelightWifiBulbLanCtrl.bulb_idx2ip.has_key(1):
+                                buff= "Nessuna lampadina connessa, accendi lampadina"
+                                bot.sendMessage(chat_id, buff)
+                                thread.start_new_thread(say,(buff,1))
+                        else:
+                                
+                                value=YeelightWifiBulbLanCtrl.toggle_bulb(1)
+                                if value==0:
+                                        buff= "Lampadina connessa non trovata, prova a spegnere e riaccendere la lampadina"
+                                        bot.sendMessage(chat_id, buff)
+                                        thread.start_new_thread(say,(buff,1))
+                                        refresh()
+                                        light = 1
+                                else:
+                                        if(light==1):
+                                                buff= "Lampadina spenta"
+                                                bot.sendMessage(chat_id, buff)
+                                                light = 0
+                                        else:
+                                                buff= "Lampadina accesa"
+                                                bot.sendMessage(chat_id, buff)
+                                                light=1
+                                        
 		elif command == '/casuale100':
 			bot.sendMessage(chat_id, random.randint(1, 100))
 		elif command == '/casuale20':
@@ -344,6 +429,9 @@ path = '/home/pi/Desktop/Tron/Music/'
 bot = telepot.Bot('324692150:AAENW7pqXh74gIn0ruxdbDeFUMytRqtlkaM')
 bot.message_loop(handle)
 print 'Tron Avviato ...'
-
+if YeelightWifiBulbLanCtrl.power == "on":
+        light=1
+else:
+        light=0
 while 1:
 	time.sleep(0)
