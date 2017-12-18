@@ -12,7 +12,7 @@ Download and play music.
 Who can interact with the Bot.
 
 * **:information_source: Info:**
-Information about the IP of the server, temperature or current date.
+Get information about the IP of the server, temperature or current date.
 
 ---
 
